@@ -139,7 +139,16 @@ export default function PageSpread({ width, height }) {
   const showCurl   = turning !== null;
   const curlSide   = turning?.direction === 'next' ? 'right' : 'left';
   const curlingPage = turning?.direction === 'next' ? right : left;
+
+  // The page revealed from behind the turning sheet (destination spread's exposed page)
   const revealedPage = turning?.direction === 'next' ? nextRight : prevLeft;
+
+  // The content printed on the OTHER SIDE of the physical sheet being turned.
+  // next: turning right page (pages[rightIndex]) → back = pages[rightIndex+1] = left of next spread
+  // prev: turning left page (pages[leftIndex])  → back = pages[leftIndex-1]  = right of prev spread
+  const backingPage = turning?.direction === 'next'
+    ? (pages[rightIndex + 1] ?? null)
+    : (pages[leftIndex  - 1] ?? null);
 
   const canGoPrev = spreadIndex > 1 || isOpen;
   const canGoNext = spreadIndex < totalSpreads;
@@ -186,6 +195,7 @@ export default function PageSpread({ width, height }) {
       {showCurl && (
         <PageCurl
           turningPage={curlingPage}
+          backingPage={backingPage}
           pageBelow={revealedPage}
           side={curlSide}
           progress={turning.progress}
