@@ -1,30 +1,36 @@
 import React from 'react';
 
 /**
- * Renders a single page surface.
- * side: 'left' | 'right' — affects spine gradient direction.
- * isTrace: renders page bg at 50% opacity, image at 100%.
- * isBacking: the back face of a turning page (slightly warm tint).
- * pageBelow: page object that shows through when this is a trace page.
+ * Single page surface.
+ *
+ * isTrace — renders page background as 50% opaque white (tracing paper effect).
+ *   The image on the trace page is at 100% opacity.
+ *   pageBelow — the page physically beneath this one in the stack — bleeds
+ *   through at reduced opacity to simulate translucency.
+ *
+ * isBacking — the reverse face of a page mid-turn (warm off-white paper back).
+ *
+ * side — 'left' | 'right', controls which direction the spine gradient falls.
  */
-export default function Page({ page, side, isTrace, isBacking, pageBelow, style = {} }) {
+export default function Page({ page, side, isTrace, isBacking, pageBelow }) {
   const isLeft = side === 'left';
 
-  // Spine shadow gradient — pages curl toward the spine
+  // Strong inner shadow toward the spine — gives the impression pages
+  // curve up and fold into the binding.
   const spineGradient = isLeft
-    ? 'linear-gradient(to left, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.06) 30%, transparent 70%)'
-    : 'linear-gradient(to right, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.06) 30%, transparent 70%)';
+    ? 'linear-gradient(to left, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0.10) 18%, rgba(0,0,0,0.02) 45%, transparent 70%)'
+    : 'linear-gradient(to right, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0.10) 18%, rgba(0,0,0,0.02) 45%, transparent 70%)';
 
-  // Edge vignette — subtle darkening at page edges
+  // Faint outer edge shadow
   const edgeGradient = isLeft
-    ? 'linear-gradient(to right, rgba(0,0,0,0.08) 0%, transparent 15%, transparent 85%, rgba(0,0,0,0.04) 100%)'
-    : 'linear-gradient(to left, rgba(0,0,0,0.08) 0%, transparent 15%, transparent 85%, rgba(0,0,0,0.04) 100%)';
+    ? 'linear-gradient(to right, rgba(0,0,0,0.10) 0%, transparent 12%)'
+    : 'linear-gradient(to left, rgba(0,0,0,0.10) 0%, transparent 12%)';
 
   const bgColor = isBacking
-    ? 'rgba(245, 240, 232, 1)' // warm paper back
+    ? '#f5f0e8'
     : isTrace
-    ? 'rgba(255,255,255,0.50)' // tracing paper
-    : 'rgba(250, 249, 246, 1)'; // standard page
+    ? 'rgba(255,255,255,0.50)'
+    : '#faf9f6';
 
   return (
     <div
@@ -34,32 +40,25 @@ export default function Page({ page, side, isTrace, isBacking, pageBelow, style 
         height: '100%',
         backgroundColor: bgColor,
         overflow: 'hidden',
-        ...style,
       }}
     >
-      {/* Page below showing through trace */}
+      {/* Trace: page beneath bleeds through at ~45% to create the semi-transparent look */}
       {isTrace && pageBelow && (
-        <div
+        <img
+          src={pageBelow.src}
+          alt=""
           style={{
             position: 'absolute',
             inset: 0,
-            // rendered at reduced opacity as part of the trace bleed
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            opacity: 0.45,
           }}
-        >
-          <img
-            src={pageBelow.src}
-            alt=""
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              opacity: 0.45,
-            }}
-          />
-        </div>
+        />
       )}
 
-      {/* Main page image */}
+      {/* Main page image — always full opacity (isolated from background opacity via rgba bg, not CSS opacity) */}
       {page?.src && !isBacking && (
         <img
           src={page.src}
@@ -70,8 +69,6 @@ export default function Page({ page, side, isTrace, isBacking, pageBelow, style 
             width: '100%',
             height: '100%',
             objectFit: 'cover',
-            // For trace, image is at full opacity (already isolated from bg opacity via rgba bg, not css opacity)
-            opacity: 1,
           }}
         />
       )}
@@ -85,10 +82,10 @@ export default function Page({ page, side, isTrace, isBacking, pageBelow, style 
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: 'rgba(0,0,0,0.12)',
-            fontSize: '0.75rem',
+            color: 'rgba(0,0,0,0.10)',
+            fontSize: '0.7rem',
             fontFamily: 'sans-serif',
-            letterSpacing: '0.1em',
+            letterSpacing: '0.12em',
           }}
         >
           BLANK
@@ -105,25 +102,13 @@ export default function Page({ page, side, isTrace, isBacking, pageBelow, style 
         }}
       />
 
-      {/* Edge vignette */}
+      {/* Outer edge vignette */}
       <div
         style={{
           position: 'absolute',
           inset: 0,
           background: edgeGradient,
           pointerEvents: 'none',
-        }}
-      />
-
-      {/* Paper texture overlay */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          backgroundImage:
-            'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'300\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.85\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3CfeColorMatrix type=\'saturate\' values=\'0\'/%3E%3C/filter%3E%3Crect width=\'300\' height=\'300\' filter=\'url(%23n)\' opacity=\'0.04\'/%3E%3C/svg%3E")',
-          pointerEvents: 'none',
-          opacity: 0.6,
         }}
       />
     </div>

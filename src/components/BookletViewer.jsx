@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useBooklet } from '../context/BookletContext.jsx';
 import PageSpread from './PageSpread.jsx';
 import ClosedBook from './ClosedBook.jsx';
@@ -9,6 +9,7 @@ export default function BookletViewer() {
   const {
     pages,
     pageSize,
+    orientation,
     isOpen,
     spreadIndex,
     totalSpreads,
@@ -24,21 +25,21 @@ export default function BookletViewer() {
 
   useKeyboard({ onNext: goNext, onPrev: goPrev });
 
-  // Compute pixel dimensions to fit the booklet in the viewport
   useEffect(() => {
     function compute() {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      const { width: pw, height: ph } = PAGE_SIZES[pageSize];
-      const pageAspect = pw / ph;
+      let { width: pw, height: ph } = PAGE_SIZES[pageSize];
+
+      // Landscape flips the page dimensions
+      if (orientation === 'landscape') [pw, ph] = [ph, pw];
+
       // Open spread = 2 pages side by side
       const spreadAspect = (pw * 2) / ph;
 
-      // Available area (leave margin for controls/arrows)
-      const availW = vw - 160; // room for arrows
+      const availW = vw - 160;
       const availH = vh - 80;
 
-      // Fit spread in available area
       let w, h;
       if (availW / spreadAspect <= availH) {
         w = availW;
@@ -48,29 +49,31 @@ export default function BookletViewer() {
         w = availH * spreadAspect;
       }
 
-      setDims({ width: Math.floor(w), height: Math.floor(h), pageAspect });
+      setDims({ width: Math.floor(w), height: Math.floor(h) });
     }
     compute();
     window.addEventListener('resize', compute);
     return () => window.removeEventListener('resize', compute);
-  }, [pageSize, PAGE_SIZES]);
+  }, [pageSize, orientation, PAGE_SIZES]);
 
   const coverPage = pages[0] ?? null;
-
   const canGoNext = isOpen ? spreadIndex < totalSpreads : pages.length > 0;
   const canGoPrev = isOpen;
 
+  // Friendly page range label — spread 1 is always just "p1", spread N is "pX–pY"
+  const leftPageNum = spreadIndex === 1 ? null : (spreadIndex - 1) * 2;
+  const rightPageNum = (spreadIndex - 1) * 2 + 1;
+  const pageLabel = spreadIndex === 1
+    ? `p1 / ${pages.length}`
+    : `p${leftPageNum}–p${Math.min(rightPageNum, pages.length)} / ${pages.length}`;
+
   return (
     <div style={outerWrap}>
-      {/* Background surface */}
       <div style={surface} />
 
-      {/* Main stage */}
       <div style={stage} ref={containerRef}>
-        {/* Prev arrow */}
         <NavArrow direction="left" onClick={goPrev} disabled={!canGoPrev} />
 
-        {/* Book */}
         <div style={{ position: 'relative' }}>
           {!isOpen ? (
             <ClosedBook
@@ -85,33 +88,31 @@ export default function BookletViewer() {
             )
           )}
 
-          {/* Page indicator */}
-          {isOpen && (
+          {isOpen && dims.width > 0 && (
             <div style={pageIndicator}>
-              {spreadIndex * 2 - 1}–{Math.min(spreadIndex * 2, pages.length)} / {pages.length}
+              {pageLabel}
               {'  ·  '}
-              <span style={{ opacity: 0.6 }}>{PAGE_SIZES[pageSize].label}</span>
+              <span style={{ opacity: 0.55 }}>
+                {PAGE_SIZES[pageSize].label}
+                {orientation === 'landscape' ? ' landscape' : ''}
+              </span>
             </div>
           )}
         </div>
 
-        {/* Next arrow */}
         <NavArrow direction="right" onClick={goNext} disabled={!canGoNext} />
       </div>
 
-      {/* Close button */}
       {isOpen && (
-        <button style={closeBtn} onClick={closeBook} title="Close book">
+        <button style={closeBtn} onClick={closeBook}>
           ✕ Close
         </button>
       )}
 
-      {/* Open hint when closed */}
       {!isOpen && (
-        <div style={openHint}>Click the book to open  ·  → to turn pages</div>
+        <div style={openHint}>Click the book to open · → to turn pages</div>
       )}
 
-      {/* Control panel */}
       <ControlPanel />
     </div>
   );
@@ -122,7 +123,7 @@ function NavArrow({ direction, onClick, disabled }) {
     <button
       style={{
         ...navArrow,
-        opacity: disabled ? 0.2 : 0.7,
+        opacity: disabled ? 0.15 : 0.65,
         cursor: disabled ? 'default' : 'pointer',
       }}
       onClick={disabled ? undefined : onClick}
@@ -141,15 +142,12 @@ const outerWrap = {
   justifyContent: 'center',
   position: 'relative',
   overflow: 'hidden',
-  background: '#5a5a5a',
 };
 
 const surface = {
   position: 'absolute',
   inset: 0,
   background: 'radial-gradient(ellipse at 50% 40%, #686868 0%, #4a4a4a 60%, #383838 100%)',
-  // Subtle desk texture via noise
-  backgroundBlendMode: 'multiply',
 };
 
 const stage = {
@@ -169,6 +167,7 @@ const navArrow = {
   padding: '0 8px',
   transition: 'opacity 0.2s',
   fontFamily: 'sans-serif',
+  flexShrink: 0,
 };
 
 const pageIndicator = {
@@ -199,7 +198,6 @@ const closeBtn = {
   fontFamily: 'sans-serif',
   backdropFilter: 'blur(8px)',
   zIndex: 10,
-  transition: 'background 0.2s',
 };
 
 const openHint = {

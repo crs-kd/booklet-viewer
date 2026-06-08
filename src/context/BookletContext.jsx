@@ -18,11 +18,9 @@ const BINDING_TYPES = {
 const initialState = {
   pages: [],
   pageSize: 'A4',
+  orientation: 'portrait', // 'portrait' | 'landscape'
   binding: 'perfect',
-  // currentSpread: which spread is showing. 0 = closed (cover only).
-  // Spread 1 = pages[0] (left cover back) + pages[1] (right p2)
-  // We track the right-page index (the first page of the right leaf)
-  spreadIndex: 0, // 0 = closed, 1 = spread showing page 1+2, etc.
+  spreadIndex: 0, // 0 = closed, 1+ = open spread
   isOpen: false,
   panelOpen: true,
 };
@@ -39,21 +37,21 @@ function reducer(state, action) {
       }));
       return { ...state, pages: [...state.pages, ...newPages] };
     }
-    case 'REMOVE_PAGE': {
-      const pages = state.pages.filter((p) => p.id !== action.payload);
-      return { ...state, pages };
-    }
-    case 'TOGGLE_TRACE': {
-      const pages = state.pages.map((p) =>
-        p.id === action.payload ? { ...p, isTrace: !p.isTrace } : p
-      );
-      return { ...state, pages };
-    }
-    case 'REORDER_PAGES': {
+    case 'REMOVE_PAGE':
+      return { ...state, pages: state.pages.filter((p) => p.id !== action.payload) };
+    case 'TOGGLE_TRACE':
+      return {
+        ...state,
+        pages: state.pages.map((p) =>
+          p.id === action.payload ? { ...p, isTrace: !p.isTrace } : p
+        ),
+      };
+    case 'REORDER_PAGES':
       return { ...state, pages: action.payload };
-    }
     case 'SET_PAGE_SIZE':
       return { ...state, pageSize: action.payload };
+    case 'SET_ORIENTATION':
+      return { ...state, orientation: action.payload };
     case 'SET_BINDING':
       return { ...state, binding: action.payload };
     case 'SET_SPREAD_INDEX':
@@ -75,14 +73,26 @@ export function BookletProvider({ children }) {
   const addPages = useCallback((srcs) => dispatch({ type: 'ADD_PAGES', payload: srcs }), []);
   const removePage = useCallback((id) => dispatch({ type: 'REMOVE_PAGE', payload: id }), []);
   const toggleTrace = useCallback((id) => dispatch({ type: 'TOGGLE_TRACE', payload: id }), []);
-  const reorderPages = useCallback((pages) => dispatch({ type: 'REORDER_PAGES', payload: pages }), []);
-  const setPageSize = useCallback((size) => dispatch({ type: 'SET_PAGE_SIZE', payload: size }), []);
+  const reorderPages = useCallback((p) => dispatch({ type: 'REORDER_PAGES', payload: p }), []);
+  const setPageSize = useCallback((s) => dispatch({ type: 'SET_PAGE_SIZE', payload: s }), []);
+  const setOrientation = useCallback((o) => dispatch({ type: 'SET_ORIENTATION', payload: o }), []);
   const setBinding = useCallback((b) => dispatch({ type: 'SET_BINDING', payload: b }), []);
   const openBook = useCallback(() => dispatch({ type: 'OPEN_BOOK' }), []);
   const closeBook = useCallback(() => dispatch({ type: 'CLOSE_BOOK' }), []);
   const togglePanel = useCallback(() => dispatch({ type: 'TOGGLE_PANEL' }), []);
 
-  const totalSpreads = Math.ceil(state.pages.length / 2);
+  // Page layout:
+  //   Closed view  → shows pages[0] as cover
+  //   Spread 1     → left: null (inside front cover / blank), right: pages[0]
+  //   Spread 2     → left: pages[1], right: pages[2]
+  //   Spread N     → left: pages[(N-1)*2 - 1], right: pages[(N-1)*2]
+  //
+  // This means pages[0] is used as the cover AND the first visible inner page (right of spread 1).
+  // This mirrors a real booklet where the front cover IS page 1.
+  //
+  // Total spreads = ceil((n+1)/2) for n pages, 0 for no pages.
+  const totalSpreads =
+    state.pages.length === 0 ? 0 : Math.ceil((state.pages.length + 1) / 2);
 
   const goNext = useCallback(() => {
     if (!state.isOpen) {
@@ -102,17 +112,21 @@ export function BookletProvider({ children }) {
     }
   }, [state.spreadIndex]);
 
-  // For a given spreadIndex, return the left and right page objects (or null)
-  // spreadIndex 1 = pages[0] left, pages[1] right
-  // spreadIndex 2 = pages[2] left, pages[3] right, etc.
+  // Returns the page objects and raw indices for the current spread.
+  // rightIdx = (spreadIndex - 1) * 2  → pages[rightIdx]
+  // leftIdx  = rightIdx - 1           → pages[leftIdx] (null if spread 1)
+  // pageBelowLeft / pageBelowRight: the next page in the physical stack (index + 2).
   const getCurrentPages = useCallback(() => {
-    const leftIdx = (state.spreadIndex - 1) * 2;
-    const rightIdx = leftIdx + 1;
+    const rightIdx = (state.spreadIndex - 1) * 2;
+    const leftIdx = rightIdx - 1;
     return {
-      left: state.pages[leftIdx] ?? null,
+      left: leftIdx >= 0 ? (state.pages[leftIdx] ?? null) : null,
       right: state.pages[rightIdx] ?? null,
       leftIndex: leftIdx,
       rightIndex: rightIdx,
+      // Each page's physical neighbour beneath it in the stack is 2 indices further
+      pageBelowLeft: leftIdx >= 0 ? (state.pages[leftIdx + 2] ?? null) : null,
+      pageBelowRight: state.pages[rightIdx + 2] ?? null,
     };
   }, [state.spreadIndex, state.pages]);
 
@@ -126,6 +140,7 @@ export function BookletProvider({ children }) {
     toggleTrace,
     reorderPages,
     setPageSize,
+    setOrientation,
     setBinding,
     openBook,
     closeBook,

@@ -5,6 +5,7 @@ export default function ControlPanel() {
   const {
     pages,
     pageSize,
+    orientation,
     binding,
     panelOpen,
     PAGE_SIZES,
@@ -14,6 +15,7 @@ export default function ControlPanel() {
     toggleTrace,
     reorderPages,
     setPageSize,
+    setOrientation,
     setBinding,
     togglePanel,
   } = useBooklet();
@@ -78,6 +80,17 @@ export default function ControlPanel() {
                 {PAGE_SIZES[key].label}
               </button>
             ))}
+          </div>
+
+          {/* Orientation */}
+          <div style={sectionLabel}>Orientation</div>
+          <div style={buttonGroup}>
+            <button style={optBtn(orientation === 'portrait')} onClick={() => setOrientation('portrait')}>
+              Portrait
+            </button>
+            <button style={optBtn(orientation === 'landscape')} onClick={() => setOrientation('landscape')}>
+              Landscape
+            </button>
           </div>
 
           {/* Binding */}
