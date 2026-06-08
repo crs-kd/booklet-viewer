@@ -82,17 +82,19 @@ export function BookletProvider({ children }) {
   const togglePanel = useCallback(() => dispatch({ type: 'TOGGLE_PANEL' }), []);
 
   // Page layout:
-  //   Closed view  → shows pages[0] as cover
-  //   Spread 1     → left: null (inside front cover / blank), right: pages[0]
-  //   Spread 2     → left: pages[1], right: pages[2]
-  //   Spread N     → left: pages[(N-1)*2 - 1], right: pages[(N-1)*2]
+  //   pages[0]  = front cover — shown only in the closed state.
+  //   Spread 1  → left: null (blank inside-front-cover), right: pages[1]
+  //   Spread 2  → left: pages[2],  right: pages[3]
+  //   Spread N  → left: pages[N*2-2], right: pages[N*2-1]   (left null for N=1)
   //
-  // This means pages[0] is used as the cover AND the first visible inner page (right of spread 1).
-  // This mirrors a real booklet where the front cover IS page 1.
+  // rightIdx(N) = N*2 - 1    (1, 3, 5, …)
+  // leftIdx(N)  = N*2 - 2    (0, 2, 4, …) — but spread 1's left is always null (inside cover)
   //
-  // Total spreads = ceil((n+1)/2) for n pages, 0 for no pages.
+  // totalSpreads: n=0 or 1 → 0 (cover only, can't open)
+  //               n≥2       → 1 + ceil((n-2)/2)
+  //   n=2 → 1, n=3 → 2, n=4 → 2, n=5 → 3, n=6 → 3, n=7 → 4 …
   const totalSpreads =
-    state.pages.length === 0 ? 0 : Math.ceil((state.pages.length + 1) / 2);
+    state.pages.length <= 1 ? 0 : 1 + Math.ceil((state.pages.length - 2) / 2);
 
   const goNext = useCallback(() => {
     if (!state.isOpen) {
@@ -113,19 +115,19 @@ export function BookletProvider({ children }) {
   }, [state.spreadIndex]);
 
   // Returns the page objects and raw indices for the current spread.
-  // rightIdx = (spreadIndex - 1) * 2  → pages[rightIdx]
-  // leftIdx  = rightIdx - 1           → pages[leftIdx] (null if spread 1)
-  // pageBelowLeft / pageBelowRight: the next page in the physical stack (index + 2).
+  // rightIdx = spreadIndex * 2 - 1
+  // leftIdx  = spreadIndex * 2 - 2  (but left is always null for spread 1 — inside cover)
+  // pageBelowLeft/Right: physical page beneath in the stack = same index + 2.
   const getCurrentPages = useCallback(() => {
-    const rightIdx = (state.spreadIndex - 1) * 2;
-    const leftIdx = rightIdx - 1;
+    const rightIdx = state.spreadIndex * 2 - 1;
+    const leftIdx = state.spreadIndex * 2 - 2;
+    const isSpreadOne = state.spreadIndex === 1;
     return {
-      left: leftIdx >= 0 ? (state.pages[leftIdx] ?? null) : null,
+      left: isSpreadOne ? null : (state.pages[leftIdx] ?? null),
       right: state.pages[rightIdx] ?? null,
-      leftIndex: leftIdx,
+      leftIndex: isSpreadOne ? -1 : leftIdx,
       rightIndex: rightIdx,
-      // Each page's physical neighbour beneath it in the stack is 2 indices further
-      pageBelowLeft: leftIdx >= 0 ? (state.pages[leftIdx + 2] ?? null) : null,
+      pageBelowLeft: isSpreadOne ? null : (state.pages[leftIdx + 2] ?? null),
       pageBelowRight: state.pages[rightIdx + 2] ?? null,
     };
   }, [state.spreadIndex, state.pages]);

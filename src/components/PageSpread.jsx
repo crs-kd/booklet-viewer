@@ -32,17 +32,17 @@ export default function PageSpread({ width, height }) {
   const { left, right, leftIndex, rightIndex, pageBelowLeft, pageBelowRight } = getCurrentPages();
 
   // Pages for the spread AFTER the current one (used to show what's revealed during curl)
-  // Next spread: rightIdx advances by 2
-  const nextRightIdx = rightIndex + 2;
-  const nextLeftIdx = rightIndex + 1;
-  const nextRight = pages[nextRightIdx] ?? null;
-  const nextLeft = pages[nextLeftIdx] ?? null;
+  // With the new indexing: rightIdx = spreadIndex*2-1, leftIdx = spreadIndex*2-2
+  // Next spread (spreadIndex+1): right = pages[rightIndex+2], left = pages[rightIndex+1]
+  const nextRight = pages[rightIndex + 2] ?? null;
+  const nextLeft  = pages[rightIndex + 1] ?? null;
 
-  // Pages for the spread BEFORE the current one
-  const prevRightIdx = rightIndex - 2;
-  const prevLeftIdx = rightIndex - 3;
-  const prevRight = pages[prevRightIdx] ?? null;
-  const prevLeft = leftIndex >= 2 ? (pages[prevLeftIdx] ?? null) : null;
+  // Prev spread (spreadIndex-1): right = pages[rightIndex-2], left = pages[leftIndex-2]
+  // Spread 1 has left=null; going back to spread 1 from spread 2 (leftIndex=2) also gives null.
+  // leftIndex=2 → leftIndex-2=0 which is pages[0]=cover — must stay null.
+  // So the condition is leftIndex > 2 (i.e. currently at spread 3+).
+  const prevRight = pages[rightIndex - 2] ?? null;
+  const prevLeft  = leftIndex > 2 ? (pages[leftIndex - 2] ?? null) : null;
 
   const animateTurn = useCallback((direction, onDone) => {
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);

@@ -60,12 +60,10 @@ export default function BookletViewer() {
   const canGoNext = isOpen ? spreadIndex < totalSpreads : pages.length > 0;
   const canGoPrev = isOpen;
 
-  // Friendly page range label — spread 1 is always just "p1", spread N is "pX–pY"
-  const leftPageNum = spreadIndex === 1 ? null : (spreadIndex - 1) * 2;
-  const rightPageNum = (spreadIndex - 1) * 2 + 1;
-  const pageLabel = spreadIndex === 1
-    ? `p1 / ${pages.length}`
-    : `p${leftPageNum}–p${Math.min(rightPageNum, pages.length)} / ${pages.length}`;
+  // Spread N: right=pages[N*2-1], left=pages[N*2-2] (null for spread 1)
+  // pages[0]=cover, pages[1]=p1, pages[2]=p2 …
+  // Display as "Spread N / M" since left page numbers change per size.
+  const pageLabel = `Spread ${spreadIndex} / ${totalSpreads}`;
 
   return (
     <div style={outerWrap}>
@@ -90,8 +88,7 @@ export default function BookletViewer() {
 
           {isOpen && dims.width > 0 && (
             <div style={pageIndicator}>
-              {pageLabel}
-              {'  ·  '}
+              {pageLabel}{'  ·  '}
               <span style={{ opacity: 0.55 }}>
                 {PAGE_SIZES[pageSize].label}
                 {orientation === 'landscape' ? ' landscape' : ''}
