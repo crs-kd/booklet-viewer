@@ -77,7 +77,7 @@ export default function PageCurl({
           transition: 'none', // Controlled by parent
         }}
       >
-        {/* Front face */}
+        {/* Front face — always mounted; backfaceVisibility hides it past 90° */}
         <div
           style={{
             position: 'absolute',
@@ -86,17 +86,10 @@ export default function PageCurl({
             WebkitBackfaceVisibility: 'hidden',
           }}
         >
-          {!showBacking && (
-            <Page
-              page={turningPage}
-              side={side}
-              isTrace={turningPage?.isTrace}
-              pageBelow={pageBelow}
-            />
-          )}
+          <Page page={turningPage} side={side} />
         </div>
 
-        {/* Back face — shown when page is flipped past 90° */}
+        {/* Back face — warm paper reverse, always mounted */}
         <div
           style={{
             position: 'absolute',
@@ -106,13 +99,7 @@ export default function PageCurl({
             WebkitBackfaceVisibility: 'hidden',
           }}
         >
-          {showBacking && (
-            <Page
-              page={null}
-              side={isRightPage ? 'left' : 'right'}
-              isBacking
-            />
-          )}
+          <Page page={null} side={isRightPage ? 'left' : 'right'} isBacking />
         </div>
 
         {/* Curl lighting — bright line at the fold edge */}
