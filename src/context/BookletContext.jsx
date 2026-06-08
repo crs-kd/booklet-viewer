@@ -83,18 +83,17 @@ export function BookletProvider({ children }) {
 
   // Page layout:
   //   pages[0]  = front cover — shown only in the closed state.
-  //   Spread 1  → left: null (blank inside-front-cover), right: pages[1]
-  //   Spread 2  → left: pages[2],  right: pages[3]
-  //   Spread N  → left: pages[N*2-2], right: pages[N*2-1]   (left null for N=1)
+  //   pages[1]  = inside front cover — left page of spread 1.
+  //   Spread 1  → left: pages[1], right: pages[2]
+  //   Spread 2  → left: pages[3], right: pages[4]
+  //   Spread N  → left: pages[N*2-1], right: pages[N*2]
   //
-  // rightIdx(N) = N*2 - 1    (1, 3, 5, …)
-  // leftIdx(N)  = N*2 - 2    (0, 2, 4, …) — but spread 1's left is always null (inside cover)
+  // leftIdx(N)  = N*2 - 1   (1, 3, 5, …)
+  // rightIdx(N) = N*2       (2, 4, 6, …)
   //
-  // totalSpreads: n=0 or 1 → 0 (cover only, can't open)
-  //               n≥2       → 1 + ceil((n-2)/2)
-  //   n=2 → 1, n=3 → 2, n=4 → 2, n=5 → 3, n=6 → 3, n=7 → 4 …
-  const totalSpreads =
-    state.pages.length <= 1 ? 0 : 1 + Math.ceil((state.pages.length - 2) / 2);
+  // totalSpreads = floor(n / 2)
+  //   n=0,1 → 0,  n=2,3 → 1,  n=4,5 → 2,  n=6,7 → 3 …
+  const totalSpreads = Math.floor(state.pages.length / 2);
 
   const goNext = useCallback(() => {
     if (!state.isOpen) {
@@ -119,15 +118,15 @@ export function BookletProvider({ children }) {
   // leftIdx  = spreadIndex * 2 - 2  (but left is always null for spread 1 — inside cover)
   // pageBelowLeft/Right: physical page beneath in the stack = same index + 2.
   const getCurrentPages = useCallback(() => {
-    const rightIdx = state.spreadIndex * 2 - 1;
-    const leftIdx = state.spreadIndex * 2 - 2;
-    const isSpreadOne = state.spreadIndex === 1;
+    const leftIdx  = state.spreadIndex * 2 - 1; // 1, 3, 5 …
+    const rightIdx = state.spreadIndex * 2;      // 2, 4, 6 …
     return {
-      left: isSpreadOne ? null : (state.pages[leftIdx] ?? null),
+      left:  state.pages[leftIdx]  ?? null,
       right: state.pages[rightIdx] ?? null,
-      leftIndex: isSpreadOne ? -1 : leftIdx,
+      leftIndex:  leftIdx,
       rightIndex: rightIdx,
-      pageBelowLeft: isSpreadOne ? null : (state.pages[leftIdx + 2] ?? null),
+      // Physical page beneath in the stack is always 2 indices further
+      pageBelowLeft:  state.pages[leftIdx  + 2] ?? null,
       pageBelowRight: state.pages[rightIdx + 2] ?? null,
     };
   }, [state.spreadIndex, state.pages]);

@@ -32,17 +32,15 @@ export default function PageSpread({ width, height }) {
   const { left, right, leftIndex, rightIndex, pageBelowLeft, pageBelowRight } = getCurrentPages();
 
   // Pages for the spread AFTER the current one (used to show what's revealed during curl)
-  // With the new indexing: rightIdx = spreadIndex*2-1, leftIdx = spreadIndex*2-2
-  // Next spread (spreadIndex+1): right = pages[rightIndex+2], left = pages[rightIndex+1]
+  // leftIdx = N*2-1, rightIdx = N*2
+  // Next spread (N+1): leftIdx+2 = next left, rightIdx+2 = next right
+  const nextLeft  = pages[leftIndex  + 2] ?? null;
   const nextRight = pages[rightIndex + 2] ?? null;
-  const nextLeft  = pages[rightIndex + 1] ?? null;
 
-  // Prev spread (spreadIndex-1): right = pages[rightIndex-2], left = pages[leftIndex-2]
-  // Spread 1 has left=null; going back to spread 1 from spread 2 (leftIndex=2) also gives null.
-  // leftIndex=2 → leftIndex-2=0 which is pages[0]=cover — must stay null.
-  // So the condition is leftIndex > 2 (i.e. currently at spread 3+).
+  // Prev spread (N-1): leftIdx-2 = prev left, rightIdx-2 = prev right
+  // At spread 1 (leftIndex=1), going prev closes the book — no prev spread to reveal.
+  const prevLeft  = leftIndex >= 3 ? (pages[leftIndex  - 2] ?? null) : null;
   const prevRight = pages[rightIndex - 2] ?? null;
-  const prevLeft  = leftIndex > 2 ? (pages[leftIndex - 2] ?? null) : null;
 
   const animateTurn = useCallback((direction, onDone) => {
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
