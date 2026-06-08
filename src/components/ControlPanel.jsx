@@ -154,8 +154,8 @@ export default function ControlPanel() {
                   )}
                 </div>
 
-                {/* Page number */}
-                <div style={pageNum}>p{i + 1}</div>
+                {/* Page label — index 0 is the cover */}
+                <div style={pageNum}>{i === 0 ? 'cvr' : `p${i}`}</div>
 
                 {/* Trace toggle */}
                 <button
@@ -183,51 +183,45 @@ export default function ControlPanel() {
   );
 }
 
-// Styles
+// Styles — panel is a true flex sidebar child, not a fixed overlay.
 const panelWrap = (open) => ({
-  position: 'fixed',
-  top: '50%',
-  right: 0,
-  transform: 'translateY(-50%)',
-  width: open ? 240 : 0,
-  maxHeight: '90vh',
-  backgroundColor: 'rgba(18,20,24,0.92)',
-  backdropFilter: 'blur(12px)',
-  borderRadius: '12px 0 0 12px',
-  boxShadow: '-4px 0 24px rgba(0,0,0,0.4)',
-  zIndex: 100,
+  position: 'relative',
+  width: open ? 256 : 36,        // 256px open, 36px collapsed (just the tab)
+  height: '100vh',
+  flexShrink: 0,
+  backgroundColor: 'rgba(18,20,24,0.97)',
+  borderLeft: '1px solid rgba(255,255,255,0.06)',
   display: 'flex',
-  flexDirection: 'column',
+  flexDirection: 'row',
   overflow: 'hidden',
   transition: 'width 0.25s ease',
+  zIndex: 10,
 });
 
 const toggleTab = {
-  position: 'absolute',
-  left: -36,
-  top: '50%',
-  transform: 'translateY(-50%)',
   width: 36,
-  height: 48,
-  background: 'rgba(18,20,24,0.92)',
+  height: '100%',
+  flexShrink: 0,
+  background: 'none',
   border: 'none',
-  borderRadius: '8px 0 0 8px',
-  color: 'rgba(255,255,255,0.6)',
-  fontSize: 12,
+  borderRight: '1px solid rgba(255,255,255,0.06)',
+  color: 'rgba(255,255,255,0.5)',
+  fontSize: 13,
   cursor: 'pointer',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  boxShadow: '-2px 0 12px rgba(0,0,0,0.3)',
+  writingMode: 'vertical-rl',
+  letterSpacing: '0.15em',
 };
 
 const panelInner = {
-  width: 240,
+  width: 220,
   padding: '20px 16px',
   overflowY: 'auto',
   overflowX: 'hidden',
   flex: 1,
-  minWidth: 240,
+  minWidth: 0,
 };
 
 const sectionTitle = {
@@ -331,7 +325,7 @@ const pageNum = {
   color: 'rgba(255,255,255,0.4)',
   fontFamily: 'monospace',
   flexShrink: 0,
-  width: 20,
+  width: 24,
 };
 
 const traceBtn = (active) => ({

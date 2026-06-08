@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useBooklet } from '../context/BookletContext.jsx';
 import PageSpread from './PageSpread.jsx';
 import ClosedBook from './ClosedBook.jsx';
@@ -14,31 +14,33 @@ export default function BookletViewer() {
     spreadIndex,
     totalSpreads,
     PAGE_SIZES,
+    panelOpen,
     openBook,
     closeBook,
     goNext,
     goPrev,
   } = useBooklet();
 
-  const containerRef = useRef();
+  // dims are recalculated whenever the panel opens/closes or window resizes.
   const [dims, setDims] = useState({ width: 0, height: 0 });
 
   useKeyboard({ onNext: goNext, onPrev: goPrev });
 
   useEffect(() => {
     function compute() {
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      let { width: pw, height: ph } = PAGE_SIZES[pageSize];
+      // The stage occupies the full viewport minus the panel width (240px when open, 0 when closed).
+      const panelW = panelOpen ? 240 : 0;
+      const stageW = window.innerWidth - panelW;
+      const stageH = window.innerHeight;
 
-      // Landscape flips the page dimensions
+      let { width: pw, height: ph } = PAGE_SIZES[pageSize];
       if (orientation === 'landscape') [pw, ph] = [ph, pw];
 
-      // Open spread = 2 pages side by side
       const spreadAspect = (pw * 2) / ph;
 
-      const availW = vw - 160;
-      const availH = vh - 80;
+      // Leave room for nav arrows (80px each side) and vertical margin (80px)
+      const availW = stageW - 160;
+      const availH = stageH - 80;
 
       let w, h;
       if (availW / spreadAspect <= availH) {
@@ -54,62 +56,61 @@ export default function BookletViewer() {
     compute();
     window.addEventListener('resize', compute);
     return () => window.removeEventListener('resize', compute);
-  }, [pageSize, orientation, PAGE_SIZES]);
+  }, [pageSize, orientation, panelOpen, PAGE_SIZES]);
 
   const coverPage = pages[0] ?? null;
-  const canGoNext = isOpen ? spreadIndex < totalSpreads : pages.length > 0;
+  const canGoNext = isOpen ? spreadIndex < totalSpreads : pages.length > 1;
   const canGoPrev = isOpen;
-
-  // Spread N: right=pages[N*2-1], left=pages[N*2-2] (null for spread 1)
-  // pages[0]=cover, pages[1]=p1, pages[2]=p2 …
-  // Display as "Spread N / M" since left page numbers change per size.
   const pageLabel = `Spread ${spreadIndex} / ${totalSpreads}`;
 
   return (
     <div style={outerWrap}>
-      <div style={surface} />
+      {/* Stage — fills everything left of the panel */}
+      <div style={stageArea}>
+        {/* Desk surface */}
+        <div style={surface} />
 
-      <div style={stage} ref={containerRef}>
-        <NavArrow direction="left" onClick={goPrev} disabled={!canGoPrev} />
+        <div style={stage}>
+          <NavArrow direction="left" onClick={goPrev} disabled={!canGoPrev} />
 
-        <div style={{ position: 'relative' }}>
-          {!isOpen ? (
-            <ClosedBook
-              coverPage={coverPage}
-              width={dims.width / 2}
-              height={dims.height}
-              onOpen={openBook}
-            />
-          ) : (
-            dims.width > 0 && (
-              <PageSpread width={dims.width} height={dims.height} />
-            )
-          )}
+          <div style={{ position: 'relative' }}>
+            {!isOpen ? (
+              dims.width > 0 && (
+                <ClosedBook
+                  coverPage={coverPage}
+                  width={dims.width / 2}
+                  height={dims.height}
+                  onOpen={openBook}
+                />
+              )
+            ) : (
+              dims.width > 0 && (
+                <PageSpread width={dims.width} height={dims.height} />
+              )
+            )}
 
-          {isOpen && dims.width > 0 && (
-            <div style={pageIndicator}>
-              {pageLabel}{'  ·  '}
-              <span style={{ opacity: 0.55 }}>
-                {PAGE_SIZES[pageSize].label}
-                {orientation === 'landscape' ? ' landscape' : ''}
-              </span>
-            </div>
-          )}
+            {isOpen && dims.width > 0 && (
+              <div style={pageIndicator}>
+                {pageLabel}{'  ·  '}
+                <span style={{ opacity: 0.55 }}>
+                  {PAGE_SIZES[pageSize].label}{orientation === 'landscape' ? ' landscape' : ''}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <NavArrow direction="right" onClick={goNext} disabled={!canGoNext} />
         </div>
 
-        <NavArrow direction="right" onClick={goNext} disabled={!canGoNext} />
+        {isOpen && (
+          <button style={closeBtn} onClick={closeBook}>✕ Close</button>
+        )}
+        {!isOpen && (
+          <div style={openHint}>Click the book to open · → to turn pages</div>
+        )}
       </div>
 
-      {isOpen && (
-        <button style={closeBtn} onClick={closeBook}>
-          ✕ Close
-        </button>
-      )}
-
-      {!isOpen && (
-        <div style={openHint}>Click the book to open · → to turn pages</div>
-      )}
-
+      {/* Side panel — true sidebar, not an overlay */}
       <ControlPanel />
     </div>
   );
@@ -118,11 +119,7 @@ export default function BookletViewer() {
 function NavArrow({ direction, onClick, disabled }) {
   return (
     <button
-      style={{
-        ...navArrow,
-        opacity: disabled ? 0.15 : 0.65,
-        cursor: disabled ? 'default' : 'pointer',
-      }}
+      style={{ ...navArrow, opacity: disabled ? 0.15 : 0.65, cursor: disabled ? 'default' : 'pointer' }}
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
     >
@@ -134,11 +131,18 @@ function NavArrow({ direction, onClick, disabled }) {
 const outerWrap = {
   width: '100vw',
   height: '100vh',
+  display: 'flex',           // panel sits as a flex sibling to the stage
+  overflow: 'hidden',
+};
+
+const stageArea = {
+  flex: 1,
+  position: 'relative',
   display: 'flex',
+  flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  position: 'relative',
-  overflow: 'hidden',
+  minWidth: 0,
 };
 
 const surface = {
@@ -180,10 +184,8 @@ const pageIndicator = {
 };
 
 const closeBtn = {
-  position: 'fixed',
+  position: 'absolute',
   bottom: 28,
-  left: '50%',
-  transform: 'translateX(-50%)',
   background: 'rgba(255,255,255,0.12)',
   border: '1px solid rgba(255,255,255,0.2)',
   borderRadius: 24,
@@ -194,17 +196,15 @@ const closeBtn = {
   letterSpacing: '0.08em',
   fontFamily: 'sans-serif',
   backdropFilter: 'blur(8px)',
-  zIndex: 10,
+  zIndex: 2,
 };
 
 const openHint = {
-  position: 'fixed',
+  position: 'absolute',
   bottom: 28,
-  left: '50%',
-  transform: 'translateX(-50%)',
   fontSize: 12,
   color: 'rgba(255,255,255,0.35)',
   fontFamily: 'sans-serif',
   letterSpacing: '0.08em',
-  zIndex: 10,
+  zIndex: 2,
 };

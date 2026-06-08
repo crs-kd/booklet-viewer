@@ -11,6 +11,54 @@ function easeInOut(t) {
   return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 }
 
+/**
+ * Renders a single page half (left or right) inside the spread.
+ * When the page is a trace page, the physical page beneath it in the stack
+ * is rendered first at full opacity, then the trace page itself is overlaid
+ * at 50% opacity — giving the translucent tracing-paper effect.
+ */
+function PageHalf({ page, side, pageBelow, canInteract, onMouseDown, onClick, showArrow }) {
+  const isTrace = page?.isTrace;
+
+  return (
+    <div
+      style={{
+        width: '50%',
+        height: '100%',
+        position: 'relative',
+        cursor: canInteract ? 'pointer' : 'default',
+        borderRadius: side === 'left' ? '2px 0 0 2px' : '0 2px 2px 0',
+        overflow: 'hidden',
+        flexShrink: 0,
+      }}
+      onMouseDown={canInteract ? onMouseDown : undefined}
+      onClick={canInteract ? onClick : undefined}
+    >
+      {/* Page-below layer — visible through the 50% trace page on top */}
+      {isTrace && pageBelow && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
+          <img
+            src={pageBelow.src}
+            alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        </div>
+      )}
+
+      {/* The page itself — at 50% opacity when trace so the layer beneath shows through */}
+      <div style={{ position: 'absolute', inset: 0, zIndex: 1, opacity: isTrace ? 0.5 : 1 }}>
+        <Page page={page} side={side} />
+      </div>
+
+      {showArrow && (
+        <div style={{ ...hintArrowStyle, [side === 'left' ? 'left' : 'right']: 10, zIndex: 2 }}>
+          {side === 'left' ? '‹' : '›'}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PageSpread({ width, height }) {
   const {
     pages,
@@ -24,21 +72,18 @@ export default function PageSpread({ width, height }) {
   } = useBooklet();
 
   const [turning, setTurning] = useState(null);
-  // turning: { direction: 'next'|'prev', progress: 0..1, animating: bool }
-
   const animFrameRef = useRef(null);
   const dragRef = useRef(null);
 
   const { left, right, leftIndex, rightIndex, pageBelowLeft, pageBelowRight } = getCurrentPages();
 
-  // Pages for the spread AFTER the current one (used to show what's revealed during curl)
   // leftIdx = N*2-1, rightIdx = N*2
-  // Next spread (N+1): leftIdx+2 = next left, rightIdx+2 = next right
+  // Next spread (N+1): leftIdx+2, rightIdx+2
   const nextLeft  = pages[leftIndex  + 2] ?? null;
   const nextRight = pages[rightIndex + 2] ?? null;
 
-  // Prev spread (N-1): leftIdx-2 = prev left, rightIdx-2 = prev right
-  // At spread 1 (leftIndex=1), going prev closes the book — no prev spread to reveal.
+  // Prev spread (N-1): leftIdx-2, rightIdx-2
+  // At spread 1 (leftIndex=1), going prev closes the book — no prev left to reveal.
   const prevLeft  = leftIndex >= 3 ? (pages[leftIndex  - 2] ?? null) : null;
   const prevRight = pages[rightIndex - 2] ?? null;
 
@@ -47,8 +92,7 @@ export default function PageSpread({ width, height }) {
     const start = performance.now();
     const step = (now) => {
       const raw = Math.min((now - start) / ANIM_DURATION, 1);
-      const progress = easeInOut(raw);
-      setTurning({ direction, progress, animating: true });
+      setTurning({ direction, progress: easeInOut(raw), animating: true });
       if (raw < 1) {
         animFrameRef.current = requestAnimationFrame(step);
       } else {
@@ -67,48 +111,40 @@ export default function PageSpread({ width, height }) {
 
   const handlePrev = useCallback(() => {
     if (turning?.animating) return;
-    if (spreadIndex <= 1) {
-      animateTurn('prev', goPrev);
-    } else {
-      animateTurn('prev', goPrev);
-    }
-  }, [turning, spreadIndex, animateTurn, goPrev]);
+    animateTurn('prev', goPrev);
+  }, [turning, animateTurn, goPrev]);
 
-  // Drag-to-turn
   const handleMouseDown = useCallback((e, side) => {
     if (turning?.animating) return;
     const startX = e.clientX;
-    dragRef.current = { startX, side, progress: 0, direction: side === 'right' ? 'next' : 'prev' };
+    const direction = side === 'right' ? 'next' : 'prev';
+    dragRef.current = { startX, side, progress: 0, direction };
 
     const onMove = (ev) => {
       if (!dragRef.current) return;
-      const dx = ev.clientX - dragRef.current.startX;
-      const progress =
-        side === 'right'
-          ? Math.max(0, Math.min(1, -dx / (width / 2)))
-          : Math.max(0, Math.min(1, dx / (width / 2)));
+      const dx = ev.clientX - startX;
+      const progress = side === 'right'
+        ? Math.max(0, Math.min(1, -dx / (width / 2)))
+        : Math.max(0, Math.min(1, dx / (width / 2)));
       dragRef.current.progress = progress;
-      setTurning({ direction: dragRef.current.direction, progress, animating: false });
+      setTurning({ direction, progress, animating: false });
     };
 
     const onUp = () => {
       if (!dragRef.current) return;
-      const { progress, direction } = dragRef.current;
+      const { progress } = dragRef.current;
       dragRef.current = null;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
 
-      const startP = progress;
       const snapForward = progress > 0.35;
-
+      const startP = progress;
       const snapStart = performance.now();
       const snapDur = snapForward ? (1 - startP) * ANIM_DURATION : startP * ANIM_DURATION;
 
       const step = (now) => {
         const t = Math.min((now - snapStart) / Math.max(snapDur, 1), 1);
-        const p = snapForward
-          ? startP + (1 - startP) * easeInOut(t)
-          : startP * (1 - easeInOut(t));
+        const p = snapForward ? startP + (1 - startP) * easeInOut(t) : startP * (1 - easeInOut(t));
         setTurning({ direction, progress: p, animating: true });
         if (t < 1) {
           animFrameRef.current = requestAnimationFrame(step);
@@ -126,10 +162,7 @@ export default function PageSpread({ width, height }) {
 
   const showCurl = turning !== null;
   const curlSide = turning?.direction === 'next' ? 'right' : 'left';
-
-  // The page physically turning
   const curlingPage = turning?.direction === 'next' ? right : left;
-  // The page revealed beneath the curl on the same side
   const revealedPage = turning?.direction === 'next' ? nextRight : prevLeft;
 
   const canGoPrev = spreadIndex > 1 || isOpen;
@@ -144,55 +177,29 @@ export default function PageSpread({ width, height }) {
         display: 'flex',
         borderRadius: 2,
         overflow: 'visible',
-        filter:
-          'drop-shadow(0 20px 60px rgba(0,0,0,0.45)) drop-shadow(0 4px 12px rgba(0,0,0,0.25))',
+        filter: 'drop-shadow(0 20px 60px rgba(0,0,0,0.45)) drop-shadow(0 4px 12px rgba(0,0,0,0.25))',
       }}
     >
-      {/* LEFT PAGE */}
-      <div
-        style={{
-          width: '50%',
-          height: '100%',
-          position: 'relative',
-          cursor: canGoPrev ? 'pointer' : 'default',
-          borderRadius: '2px 0 0 2px',
-          overflow: 'hidden',
-        }}
-        onMouseDown={canGoPrev ? (e) => handleMouseDown(e, 'left') : undefined}
-        onClick={canGoPrev && !turning ? handlePrev : undefined}
-      >
-        <Page
-          page={left}
-          side="left"
-          isTrace={left?.isTrace}
-          pageBelow={pageBelowLeft}
-        />
-        {canGoPrev && !turning && <div style={hintArrowStyle('left')}>‹</div>}
-      </div>
+      <PageHalf
+        page={left}
+        side="left"
+        pageBelow={pageBelowLeft}
+        canInteract={canGoPrev && !turning}
+        onMouseDown={(e) => handleMouseDown(e, 'left')}
+        onClick={handlePrev}
+        showArrow={canGoPrev && !turning}
+      />
 
-      {/* RIGHT PAGE */}
-      <div
-        style={{
-          width: '50%',
-          height: '100%',
-          position: 'relative',
-          cursor: canGoNext ? 'pointer' : 'default',
-          borderRadius: '0 2px 2px 0',
-          overflow: 'hidden',
-        }}
-        onMouseDown={canGoNext ? (e) => handleMouseDown(e, 'right') : undefined}
-        onClick={canGoNext && !turning ? handleNext : undefined}
-      >
-        <Page
-          page={right}
-          side="right"
-          isTrace={right?.isTrace}
-          pageBelow={pageBelowRight}
-        />
-        {canGoNext && !turning && <div style={hintArrowStyle('right')}>›</div>}
-      </div>
+      <PageHalf
+        page={right}
+        side="right"
+        pageBelow={pageBelowRight}
+        canInteract={canGoNext && !turning}
+        onMouseDown={(e) => handleMouseDown(e, 'right')}
+        onClick={handleNext}
+        showArrow={canGoNext && !turning}
+      />
 
-      {/* Page curl animation */}
       {showCurl && (
         <PageCurl
           turningPage={curlingPage}
@@ -204,7 +211,6 @@ export default function PageSpread({ width, height }) {
         />
       )}
 
-      {/* Binding */}
       {binding === 'ring' ? (
         <RingBinding bookHeight={height} />
       ) : (
@@ -214,18 +220,15 @@ export default function PageSpread({ width, height }) {
   );
 }
 
-function hintArrowStyle(side) {
-  return {
-    position: 'absolute',
-    top: '50%',
-    [side === 'left' ? 'left' : 'right']: 10,
-    transform: 'translateY(-50%)',
-    fontSize: 30,
-    color: 'rgba(255,255,255,0.45)',
-    textShadow: '0 1px 4px rgba(0,0,0,0.4)',
-    pointerEvents: 'none',
-    userSelect: 'none',
-    fontFamily: 'sans-serif',
-    lineHeight: 1,
-  };
-}
+const hintArrowStyle = {
+  position: 'absolute',
+  top: '50%',
+  transform: 'translateY(-50%)',
+  fontSize: 30,
+  color: 'rgba(255,255,255,0.45)',
+  textShadow: '0 1px 4px rgba(0,0,0,0.4)',
+  pointerEvents: 'none',
+  userSelect: 'none',
+  fontFamily: 'sans-serif',
+  lineHeight: 1,
+};

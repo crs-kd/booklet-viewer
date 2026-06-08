@@ -3,34 +3,27 @@ import React from 'react';
 /**
  * Single page surface.
  *
- * isTrace — renders page background as 50% opaque white (tracing paper effect).
- *   The image on the trace page is at 100% opacity.
- *   pageBelow — the page physically beneath this one in the stack — bleeds
- *   through at reduced opacity to simulate translucency.
+ * isTrace: page paper is 50% opaque (tracing paper).
+ *   The opacity wrapper is applied by the PARENT (PageSpread), not here.
+ *   This component only renders the content — background, image, gradients.
  *
- * isBacking — the reverse face of a page mid-turn (warm off-white paper back).
+ * isBacking: the reverse face of a turning page (warm off-white).
  *
- * side — 'left' | 'right', controls which direction the spine gradient falls.
+ * side: 'left' | 'right' — controls which direction the spine shadow falls.
  */
-export default function Page({ page, side, isTrace, isBacking, pageBelow }) {
+export default function Page({ page, side, isBacking }) {
   const isLeft = side === 'left';
 
-  // Strong inner shadow toward the spine — gives the impression pages
-  // curve up and fold into the binding.
+  // Strong shadow toward the spine — pages curve into the binding.
   const spineGradient = isLeft
-    ? 'linear-gradient(to left, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0.10) 18%, rgba(0,0,0,0.02) 45%, transparent 70%)'
+    ? 'linear-gradient(to left,  rgba(0,0,0,0.28) 0%, rgba(0,0,0,0.10) 18%, rgba(0,0,0,0.02) 45%, transparent 70%)'
     : 'linear-gradient(to right, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0.10) 18%, rgba(0,0,0,0.02) 45%, transparent 70%)';
 
-  // Faint outer edge shadow
   const edgeGradient = isLeft
     ? 'linear-gradient(to right, rgba(0,0,0,0.10) 0%, transparent 12%)'
-    : 'linear-gradient(to left, rgba(0,0,0,0.10) 0%, transparent 12%)';
+    : 'linear-gradient(to left,  rgba(0,0,0,0.10) 0%, transparent 12%)';
 
-  const bgColor = isBacking
-    ? '#f5f0e8'
-    : isTrace
-    ? 'rgba(255,255,255,0.50)'
-    : '#faf9f6';
+  const bgColor = isBacking ? '#f5f0e8' : '#faf9f6';
 
   return (
     <div
@@ -42,23 +35,6 @@ export default function Page({ page, side, isTrace, isBacking, pageBelow }) {
         overflow: 'hidden',
       }}
     >
-      {/* Trace: page beneath bleeds through at ~45% to create the semi-transparent look */}
-      {isTrace && pageBelow && (
-        <img
-          src={pageBelow.src}
-          alt=""
-          style={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            opacity: 0.45,
-          }}
-        />
-      )}
-
-      {/* Main page image — always full opacity (isolated from background opacity via rgba bg, not CSS opacity) */}
       {page?.src && !isBacking && (
         <img
           src={page.src}
@@ -73,7 +49,6 @@ export default function Page({ page, side, isTrace, isBacking, pageBelow }) {
         />
       )}
 
-      {/* Empty page placeholder */}
       {!page && !isBacking && (
         <div
           style={{
@@ -92,25 +67,10 @@ export default function Page({ page, side, isTrace, isBacking, pageBelow }) {
         </div>
       )}
 
-      {/* Spine curvature gradient */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: spineGradient,
-          pointerEvents: 'none',
-        }}
-      />
-
-      {/* Outer edge vignette */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: edgeGradient,
-          pointerEvents: 'none',
-        }}
-      />
+      {/* Spine curvature shadow */}
+      <div style={{ position: 'absolute', inset: 0, background: spineGradient, pointerEvents: 'none' }} />
+      {/* Outer edge shadow */}
+      <div style={{ position: 'absolute', inset: 0, background: edgeGradient, pointerEvents: 'none' }} />
     </div>
   );
 }
